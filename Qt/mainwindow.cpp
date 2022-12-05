@@ -26,7 +26,11 @@ MainWindow::MainWindow(QWidget *parent, bool fullscreen) :
 	nextState(CORE_POWERDOWN),
 	lastUIState(UISTATE_MENU)
 {
+#if defined(ASSETS_DIR)
+	setWindowIcon(QIcon(ASSETS_DIR "icon_regular_72.png"));
+#else
 	setWindowIcon(QIcon(qApp->applicationDirPath() + "/assets/icon_regular_72.png"));
+#endif
 
 	SetGameTitle("");
 	emugl = new MainUI(this);
