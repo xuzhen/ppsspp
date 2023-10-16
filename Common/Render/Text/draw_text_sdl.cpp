@@ -46,23 +46,16 @@ TextDrawerSDL::~TextDrawerSDL() {
 // If a user complains about missing characters on SDL, re-visit this!
 void TextDrawerSDL::PrepareFallbackFonts() {
 #if defined(USE_SDL2_TTF_FONTCONFIG)
-	FcObjectSet *os = FcObjectSetBuild (FC_FILE, FC_INDEX, (char *) 0);
+	FcPattern *pat = FcNameParse((const FcChar8 *) "Sans");
+	FcConfigSubstitute(config, pat, FcMatchPattern);
+	FcDefaultSubstitute(pat);
 
-	FcPattern *names[] = {
-		FcNameParse((const FcChar8 *) "Source Han Sans Medium"),
-		FcNameParse((const FcChar8 *) "Droid Sans Bold"),
-		FcNameParse((const FcChar8 *) "DejaVu Sans Condensed"),
-		FcNameParse((const FcChar8 *) "Noto Sans CJK Medium"),
-		FcNameParse((const FcChar8 *) "Noto Sans Hebrew Medium"),
-		FcNameParse((const FcChar8 *) "Noto Sans Lao Medium"),
-		FcNameParse((const FcChar8 *) "Noto Sans Thai Medium")
-	};
+	FcResult result;
+	FcFontSet* foundFonts = FcFontSort(config, pat, FcTrue, nullptr, &result);
 
-	for (int i = 0; i < ARRAY_SIZE(names); i++) {
-		FcFontSet *foundFonts = FcFontList(config, names[i], os);
-		
-		for (int j = 0; foundFonts && j < foundFonts->nfont; ++j) {
-			FcPattern* font = foundFonts->fonts[j];
+	if (foundFonts) {
+		for (int i = 0; i < foundFonts->nfont; ++i) {
+			FcPattern* font = foundFonts->fonts[i];
 			FcChar8 *path;
 			int fontIndex;
 
@@ -75,17 +68,9 @@ void TextDrawerSDL::PrepareFallbackFonts() {
 				fallbackFontPaths_.push_back(std::make_pair(path_str, fontIndex));
 			}
 		}
-
-		if (foundFonts) {
-			FcFontSetDestroy(foundFonts);
-		}
-
-		FcPatternDestroy(names[i]);
+		FcFontSetSortDestroy(foundFonts);
 	}
-
-	if (os) {
-		FcObjectSetDestroy(os);
-	}
+	FcPatternDestroy(pat);
 #elif PPSSPP_PLATFORM(MAC)
 	const char *fontDirs[] = {
 		"/System/Library/Fonts/",
