@@ -139,6 +139,39 @@ uint32_t TextDrawerSDL::CheckMissingGlyph(const std::string& text) {
 
 // If this returns true, the first font in fallbackFonts_ can be used as a fallback.
 bool TextDrawerSDL::FindFallbackFonts(uint32_t missingGlyph, int ptSize) {
+#if defined(USE_SDL2_TTF_FONTCONFIG)
+	// If we encounter a missing glyph, try to use the best fallback fonts.
+	auto glyphMapKey = std::make_pair(missingGlyph, ptSize);
+	auto iter = glyphMap_.find(glyphMapKey);
+	if (iter != glyphMap_.end()) {
+		return true;
+	}
+
+	for (int i = 0; i < fallbackFontPaths_.size(); i++) {
+		std::string& fontPath = fallbackFontPaths_[i].first;
+		int faceIndex = fallbackFontPaths_[i].second;
+
+		TTF_Font *font;
+		auto fontsMapKey = std::make_pair(fontPath, ptSize);
+		bool newFont = (fallbackFontsMap_.find(fontsMapKey) == fallbackFontsMap_.end());
+		if (newFont) {
+			font = TTF_OpenFontIndex(fontPath.c_str(), ptSize, faceIndex);
+		} else {
+			font = fallbackFontsMap_[fontsMapKey];
+		}
+		if (TTF_GlyphIsProvided32(font, missingGlyph)) {
+			glyphMap_[glyphMapKey] = font;
+			if (newFont) {
+				fallbackFontsMap_[fontsMapKey] = font;
+			}
+			return true;
+		} else {
+			if (newFont) {
+				TTF_CloseFont(font);
+			}
+		}
+	}
+#else
 	// If we encounter a missing glyph, try to use one of the fallback fonts.
 	for (int i = 0; i < fallbackFonts_.size(); i++) {
 		TTF_Font *fallbackFont = fallbackFonts_[i];
@@ -163,6 +196,7 @@ bool TextDrawerSDL::FindFallbackFonts(uint32_t missingGlyph, int ptSize) {
 			TTF_CloseFont(font);
 		}
 	}
+#endif
 
 	return false;
 }
@@ -218,7 +252,11 @@ void TextDrawerSDL::MeasureString(const char *str, size_t len, float *w, float *
 		uint32_t missingGlyph = CheckMissingGlyph(key.text);
 		
 		if (missingGlyph && FindFallbackFonts(missingGlyph, ptSize)) {
+#if defined(USE_SDL2_TTF_FONTCONFIG)
+			font = glyphMap_[std::make_pair(missingGlyph, ptSize)];
+#else
 			font = fallbackFonts_[0];
+#endif
 		}
 
 		int width = 0;
@@ -249,7 +287,11 @@ void TextDrawerSDL::MeasureStringRect(const char *str, size_t len, const Bounds 
 	uint32_t missingGlyph = CheckMissingGlyph(toMeasure);
 
 	if (missingGlyph && FindFallbackFonts(missingGlyph, ptSize)) {
+#if defined(USE_SDL2_TTF_FONTCONFIG)
+		font = glyphMap_[std::make_pair(missingGlyph, ptSize)];
+#else
 		font = fallbackFonts_[0];
+#endif
 	}
 
 	std::vector<std::string> lines;
@@ -360,7 +402,11 @@ void TextDrawerSDL::DrawStringBitmap(std::vector<uint8_t> &bitmapData, TextStrin
 	uint32_t missingGlyph = CheckMissingGlyph(processedStr);
 
 	if (missingGlyph && FindFallbackFonts(missingGlyph, ptSize)) {
+#if defined(USE_SDL2_TTF_FONTCONFIG)
+		font = glyphMap_[std::make_pair(missingGlyph, ptSize)];
+#else
 		font = fallbackFonts_[0];
+#endif
 	}
 
 #if SDL_TTF_VERSION_ATLEAST(2, 20, 0)
@@ -453,11 +499,21 @@ void TextDrawerSDL::ClearCache() {
 	for (auto iter : fontMap_) {
 		TTF_CloseFont(iter.second);
 	}
+	fontMap_.clear();
+
+#if defined(USE_SDL2_TTF_FONTCONFIG)
+	for (auto iter : fallbackFontsMap_) {
+		TTF_CloseFont(iter.second);
+	}
+	fallbackFontsMap_.clear();
+	glyphMap_.clear();
+#else
 	for (auto iter : fallbackFonts_) {
 		TTF_CloseFont(iter);
 	}
-	fontMap_.clear();
 	fallbackFonts_.clear();
+#endif
+
 	fontHash_ = 0;
 }
 

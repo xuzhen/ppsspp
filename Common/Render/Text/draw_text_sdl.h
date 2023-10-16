@@ -38,10 +38,14 @@ protected:
 	std::map<CacheKey, std::unique_ptr<TextStringEntry>> cache_;
 	std::map<CacheKey, std::unique_ptr<TextMeasureEntry>> sizeCache_;
 
-	std::vector<_TTF_Font *> fallbackFonts_;
 	std::vector<std::pair<std::string, int>> fallbackFontPaths_; // path and font face index
 
 #if defined(USE_SDL2_TTF_FONTCONFIG)
 	FcConfig *config;
+	std::map<std::pair<uint32_t, int>, _TTF_Font *> glyphMap_;
+	std::map<std::pair<std::string, int>, _TTF_Font *> fallbackFontsMap_;
+#else
+	std::vector<_TTF_Font *> fallbackFonts_;
 #endif
+
 };
